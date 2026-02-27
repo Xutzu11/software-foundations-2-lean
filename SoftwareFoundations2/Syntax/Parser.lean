@@ -15,6 +15,7 @@ syntax aexp " + " aexp : aexp
 syntax aexp " - " aexp : aexp
 syntax aexp " * " aexp : aexp
 syntax "(" aexp ")" : aexp
+syntax "↑"term:arg : aexp
 
 syntax "btrue"  : bexp
 syntax "bfalse"  : bexp
@@ -25,6 +26,7 @@ syntax aexp  " > " aexp : bexp
 syntax "!" bexp : bexp
 syntax bexp " && " bexp : bexp
 syntax "(" bexp ")" : bexp
+syntax "↑"term:arg : bexp
 
 syntax "skip"  : com
 syntax ident " = " aexp : com
@@ -34,18 +36,21 @@ syntax "if " bexp " then " com " else " com " endif" : com
 syntax "while " bexp " do " com " od" : com
 syntax "{ " com " }" : com
 syntax "{ " " }" : com
-syntax "↑"term : com
+syntax "↑"term:arg : com
 
-partial def elabAExp : Syntax → MetaM Expr
+partial def elabAExp : Syntax → TermElabM Expr
   | `(aexp| $n:num)    => return mkApp (.const ``AExp.ANum []) (mkNatLit n.getNat)
   | `(aexp| $x:ident)  => return mkApp (.const ``AExp.AId []) (mkStrLit <| identToString x)
   | `(aexp| $a1 + $a2) => return mkAppN (.const ``AExp.APlus  []) #[← elabAExp a1, ← elabAExp a2]
   | `(aexp| $a1 - $a2) => return mkAppN (.const ``AExp.AMinus []) #[← elabAExp a1, ← elabAExp a2]
   | `(aexp| $a1 * $a2) => return mkAppN (.const ``AExp.AMult  []) #[← elabAExp a1, ← elabAExp a2]
   | `(aexp| ( $a ))    => elabAExp a
+  | `(aexp| ↑$t:term)                       => do
+        let e ← elabTerm t (some (.const `AExp []))
+        return e
   | _                  => throwUnsupportedSyntax
 
-partial def elabBExp : Syntax → MetaM Expr
+partial def elabBExp : Syntax → TermElabM Expr
   | `(bexp| btrue)               =>
           return .const ``BExp.BTrue  []
   | `(bexp| bfalse)              =>
@@ -63,6 +68,9 @@ partial def elabBExp : Syntax → MetaM Expr
   | `(bexp| $b1 && $b2)     =>
           return mkAppN (.const ``BExp.BAnd []) #[← elabBExp b1, ← elabBExp b2]
   | `(bexp| ( $b ))         => elabBExp b
+  | `(bexp| ↑$t:term)                       => do
+        let e ← elabTerm t (some (.const `BExp []))
+        return e
   | _                       => throwUnsupportedSyntax
 
 partial def elabCom : Syntax → TermElabM Expr
@@ -85,8 +93,8 @@ partial def elabCom : Syntax → TermElabM Expr
         return e
   | _                                     => throwUnsupportedSyntax
 
-elab "arith⟨{" exp:aexp "}⟩" : term => elabAExp exp
-elab "bool⟨{" exp:bexp "}⟩" : term => elabBExp exp
+elab "aexp⟨{" exp:aexp "}⟩" : term => elabAExp exp
+elab "bexp⟨{" exp:bexp "}⟩" : term => elabBExp exp
 elab "⟨{" pgm:com "}⟩"  : term => elabCom pgm
 
 @[app_unexpander AExp.ANum]
@@ -163,7 +171,12 @@ def unexpandCAsgn : Unexpander
 
 @[app_unexpander Com.CSeq]
 def unexpandCSeq : Unexpander
-  | `($_ $c₁ $c₂) => `(com| $(⟨c₁.raw⟩) ; $(⟨c₂.raw⟩))
+  | `($_ $c₁ $c₂) =>
+      match c₂ with
+      | `(com| $c₂ ; $c₃) =>
+          `(com| $(⟨c₁.raw⟩) ; { $(⟨c₂.raw⟩) ; $(⟨c₃.raw⟩) } )
+      | _ =>
+          `(com| $(⟨c₁.raw⟩) ; $(⟨c₂.raw⟩))
   | _ => throw ()
 
 @[app_unexpander Com.CIf]
