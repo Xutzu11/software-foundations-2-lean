@@ -140,7 +140,7 @@ theorem true_while
   sorry
 
 theorem assign_aequiv
-  (h : aexp⟨{ x }⟩ ≃ a ) :
+  (h : aexp⟨{ x }⟩ ≃ ↑a ) :
   ⟨{ x = ↑a }⟩ ≃ ⟨{ skip }⟩ := by
   -- FILL IN HERE
   sorry
@@ -167,7 +167,7 @@ theorem equiv_symm : c₁ ≃ c₂ → c₂ ≃ c₁ := by
 
 set_option warn.sorry false in
 theorem equiv_congr_asgn {a₁ a₂ : AExp} (h : a₁ ≃ a₂) :
-  ⟨{ ↑x = a₁ }⟩ ≃ ⟨{ ↑x = a₂ }⟩ := by
+  ⟨{ ↑x = ↑a₁ }⟩ ≃ ⟨{ ↑x = ↑a₂ }⟩ := by
   -- FILL IN HERE (optional: PR will pass without it)
   sorry
 
